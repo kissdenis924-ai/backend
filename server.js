@@ -1,3 +1,7 @@
+app.get("/", (req, res) => {
+  res.send("✅ Barter Trade backend is running successfully!");
+});
+
 // ------------------
 // server.js - Backend with REST + Socket.IO, Search/Filter, Pagination, Image Upload
 // ------------------
