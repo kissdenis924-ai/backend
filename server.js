@@ -1,7 +1,3 @@
-app.get("/", (req, res) => {
-  res.send("✅ Barter Trade backend is running successfully!");
-});
-
 // ------------------
 // server.js - Backend with REST + Socket.IO, Search/Filter, Pagination, Image Upload
 // ------------------
@@ -17,7 +13,7 @@ const { Server } = require("socket.io");
 const multer = require("multer");
 const path = require("path");
 
-const app = express();
+const app = express(); // ✅ Define app FIRST
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 
@@ -34,11 +30,19 @@ app.use(express.json());
 // Serve uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// ✅ Default root route for Render test
+app.get("/", (req, res) => {
+  res.send("✅ Barter Trade backend is running successfully!");
+});
+
 // ------------------
 // MongoDB Connection
 // ------------------
 const mongoURI = process.env.MONGO_URI;
-if (!mongoURI) { console.error("❌ MongoDB connection string is missing in .env!"); process.exit(1); }
+if (!mongoURI) {
+  console.error("❌ MongoDB connection string is missing in .env!");
+  process.exit(1);
+}
 
 mongoose.connect(mongoURI)
   .then(() => console.log("✅ Connected to MongoDB"))
@@ -47,7 +51,12 @@ mongoose.connect(mongoURI)
 // ------------------
 // Schemas & Models
 // ------------------
-const userSchema = new mongoose.Schema({ name: String, email: { type: String, unique: true }, password: String, phone: String });
+const userSchema = new mongoose.Schema({
+  name: String,
+  email: { type: String, unique: true },
+  password: String,
+  phone: String
+});
 const User = mongoose.model("User", userSchema);
 
 const itemSchema = new mongoose.Schema({
@@ -84,17 +93,36 @@ const Message = mongoose.model("Message", messageSchema);
 // ------------------
 const auth = (req, res, next) => {
   const token = (req.header("Authorization") || "").replace("Bearer ", "");
-  if (!token) return res.status(401).json({ success: false, message: "No token provided" });
-  try { req.user = jwt.verify(token, JWT_SECRET); next(); } catch (err) { return res.status(401).json({ success: false, message: "Invalid token" }); }
+  if (!token)
+    return res.status(401).json({ success: false, message: "No token provided" });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: "Invalid token" });
+  }
 };
 
 // ------------------
 // Socket.IO User Tracking
 // ------------------
 const onlineUsers = new Map();
-function addSocketForUser(userId, socketId) { const s = onlineUsers.get(userId) || new Set(); s.add(socketId); onlineUsers.set(userId, s); }
-function removeSocketForUser(userId, socketId) { const s = onlineUsers.get(userId); if (!s) return; s.delete(socketId); if (!s.size) onlineUsers.delete(userId); else onlineUsers.set(userId, s); }
-function getSocketIdsForUser(userId) { const s = onlineUsers.get(userId); return s ? Array.from(s) : []; }
+function addSocketForUser(userId, socketId) {
+  const s = onlineUsers.get(userId) || new Set();
+  s.add(socketId);
+  onlineUsers.set(userId, s);
+}
+function removeSocketForUser(userId, socketId) {
+  const s = onlineUsers.get(userId);
+  if (!s) return;
+  s.delete(socketId);
+  if (!s.size) onlineUsers.delete(userId);
+  else onlineUsers.set(userId, s);
+}
+function getSocketIdsForUser(userId) {
+  const s = onlineUsers.get(userId);
+  return s ? Array.from(s) : [];
+}
 
 // ------------------
 // Socket.IO Auth & Events
@@ -105,7 +133,9 @@ io.use((socket, next) => {
     if (!token) return next(new Error("Authentication error: token required"));
     socket.user = jwt.verify(token.replace("Bearer ", ""), JWT_SECRET);
     next();
-  } catch (err) { next(new Error("Authentication error: invalid token")); }
+  } catch (err) {
+    next(new Error("Authentication error: invalid token"));
+  }
 });
 io.on("connection", (socket) => {
   const userId = socket.user.id;
@@ -137,12 +167,16 @@ const upload = multer({
 app.post("/register", async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ success: false, message: "All fields required" });
-    if (await User.findOne({ email })) return res.status(400).json({ success: false, message: "Email exists" });
+    if (!name || !email || !password)
+      return res.status(400).json({ success: false, message: "All fields required" });
+    if (await User.findOne({ email }))
+      return res.status(400).json({ success: false, message: "Email exists" });
     const hashed = await bcrypt.hash(password, 10);
     const newUser = await User.create({ name, email, password: hashed, phone });
     res.json({ success: true, user: { id: newUser._id, name, email, phone } });
-  } catch (err) { res.status(500).json({ success: false, message: "Server error" }); }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 app.post("/login", async (req, res) => {
@@ -150,10 +184,13 @@ app.post("/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ success: false, message: "Invalid credentials" });
-    if (!await bcrypt.compare(password, user.password)) return res.status(400).json({ success: false, message: "Invalid credentials" });
+    if (!await bcrypt.compare(password, user.password))
+      return res.status(400).json({ success: false, message: "Invalid credentials" });
     const token = jwt.sign({ id: user._id, email }, JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, token });
-  } catch (err) { res.status(500).json({ success: false, message: "Server error" }); }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 // ------------------
@@ -178,13 +215,16 @@ app.post("/api/items", auth, upload.single('image'), async (req, res) => {
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
     const item = await Item.create({ name, description, price, category, userId: req.user.id, imageUrl });
     res.status(201).json({ success: true, item });
-  } catch (err) { res.status(500).json({ success: false, message: "Server error" }); }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 app.get("/api/items", async (req, res) => {
   try {
     let { page = 1, limit = 10, name, category, minPrice, maxPrice, sort } = req.query;
-    page = parseInt(page); limit = parseInt(limit);
+    page = parseInt(page);
+    limit = parseInt(limit);
     const filter = {};
     if (name) filter.name = { $regex: name, $options: 'i' };
     if (category) filter.category = category;
@@ -199,7 +239,9 @@ app.get("/api/items", async (req, res) => {
     const totalPages = Math.ceil(totalItems / limit);
     const items = await query.skip((page - 1) * limit).limit(limit);
     res.json({ success: true, items, totalItems, totalPages, currentPage: page });
-  } catch (err) { res.status(500).json({ success: false, message: "Server error" }); }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 app.get("/api/items/:id", async (req, res) => {
@@ -214,7 +256,8 @@ app.get("/api/items/:id", async (req, res) => {
 app.get("/trades", auth, async (req, res) => {
   try {
     let { page = 1, limit = 10, status } = req.query;
-    page = parseInt(page); limit = parseInt(limit);
+    page = parseInt(page);
+    limit = parseInt(limit);
     const filter = { $or: [{ fromUser: req.user.id }, { toUser: req.user.id }] };
     if (status) filter.status = status;
     const totalItems = await Trade.countDocuments(filter);
@@ -224,9 +267,12 @@ app.get("/trades", auth, async (req, res) => {
       .populate("itemRequested")
       .populate("fromUser", "name email")
       .populate("toUser", "name email")
-      .skip((page - 1) * limit).limit(limit);
+      .skip((page - 1) * limit)
+      .limit(limit);
     res.json({ success: true, trades, totalItems, totalPages, currentPage: page });
-  } catch (err) { res.status(500).json({ success: false, message: "Server error" }); }
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
 // ------------------
